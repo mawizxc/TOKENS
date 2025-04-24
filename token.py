@@ -77,8 +77,7 @@ class Lexer:
         return Token(EOF, None)
 
 
-# AST Node Definitions
-class AST:
+class AST(object):
     pass
 
 class BinOp(AST):
@@ -92,17 +91,20 @@ class Num(AST):
         self.token = token
         self.value = token.value
 
-
-# Parser Class
 class Parser:
     def __init__(self, lexer):
         self.lexer = lexer
+        # set current token to the first token taken from the input
         self.current_token = self.lexer.get_next_token()
 
     def error(self):
         raise Exception('Invalid syntax')
 
     def eat(self, token_type):
+        # compare the current token type with the passed token
+        # type and if they match then "eat" the current token
+        # and assign the next token to the self.current_token,
+        # otherwise raise an exception
         if self.current_token.type == token_type:
             self.current_token = self.lexer.get_next_token()
         else:
@@ -149,7 +151,6 @@ class Parser:
         return self.expr()
 
 
-# Node Visitor
 class NodeVisitor:
     def visit(self, node):
         method_name = 'visit_' + type(node).__name__
@@ -159,8 +160,6 @@ class NodeVisitor:
     def generic_visit(self, node):
         raise Exception(f'No visit_{type(node).__name__} method')
 
-
-# Interpreter using Visitor pattern
 class Interpreter(NodeVisitor):
     def __init__(self, parser):
         self.parser = parser
@@ -183,15 +182,18 @@ class Interpreter(NodeVisitor):
         return self.visit(tree)
 
 
-# Main driver
 def main():
     while True:
         try:
-            text = input('calc> ')
-        except EOFError:
+            try:
+                text = raw_input('spi> ')
+            except NameError: # Python3
+                text = input(' spi> ')
+        except EOFErorr:
             break
         if not text:
             continue
+        
         lexer = Lexer(text)
         parser = Parser(lexer)
         interpreter = Interpreter(parser)
