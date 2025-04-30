@@ -1,20 +1,26 @@
-# Token types
+# Token types 
+# 
+# EOF (end-of-file) token is used to indicate that 
+# there is no more input left for lexical analysis
 INTEGER, PLUS, MINUS, MUL, DIV, LPAREN, RPAREN, EOF = (
-    'INTEGER', 'PLUS', 'MINUS', 'MUL', 'DIV', 'LPAREN', 'RPAREN', 'EOF'
+    'INTEGER', 'PLUS', 'MINUS', 'MUL', 'DIV', '(', ')', 'EOF'
 )
 
-class Token:
+class Token(object):
     def __init__(self, type, value):
         self.type = type
         self.value = value
 
     def __str__(self):
-        return f'Token({self.type}, {repr(self.value)})'
+        return 'Token({type}, {value})'.format(
+            type=self.type,
+            value=repr(self.value)
+        )
 
     def __repr__(self):
         return self.__str__()
 
-class Lexer:
+class Lexer(object):
     def __init__(self, text):
         self.text = text
         self.pos = 0
@@ -25,7 +31,10 @@ class Lexer:
 
     def advance(self):
         self.pos += 1
-        self.current_char = None if self.pos >= len(self.text) else self.text[self.pos]
+        if self.pos > len(self.text) - 1:
+            self.current_char = None
+        else:
+            self.current_char = self.text[self.pos]
 
     def skip_whitespace(self):
         while self.current_char is not None and self.current_char.isspace():
@@ -76,7 +85,6 @@ class Lexer:
 
         return Token(EOF, None)
 
-
 class AST(object):
     pass
 
@@ -91,28 +99,37 @@ class Num(AST):
         self.token = token
         self.value = token.value
 
-class Parser:
+class UnaryOp(AST):
+    def __init__(self, op, expr):
+        self.token = self.op = op
+        self.expr = expr
+
+class Parser(object):
     def __init__(self, lexer):
         self.lexer = lexer
-        # set current token to the first token taken from the input
         self.current_token = self.lexer.get_next_token()
 
     def error(self):
         raise Exception('Invalid syntax')
 
     def eat(self, token_type):
-        # compare the current token type with the passed token
-        # type and if they match then "eat" the current token
-        # and assign the next token to the self.current_token,
-        # otherwise raise an exception
         if self.current_token.type == token_type:
             self.current_token = self.lexer.get_next_token()
         else:
             self.error()
 
     def factor(self):
+        """factor : (PLUS | MINUS) factor | INTEGER | LPAREN expr RPAREN"""
         token = self.current_token
-        if token.type == INTEGER:
+        if token.type == PLUS:
+            self.eat(PLUS)
+            node = UnaryOp(token, self.factor())
+            return node
+        elif token.type == MINUS:
+            self.eat(MINUS)
+            node = UnaryOp(token, self.factor())
+            return node
+        elif token.type == INTEGER:
             self.eat(INTEGER)
             return Num(token)
         elif token.type == LPAREN:
@@ -122,6 +139,7 @@ class Parser:
             return node
 
     def term(self):
+        """term : factor ((MUL | DIV) factor)*"""
         node = self.factor()
 
         while self.current_token.type in (MUL, DIV):
@@ -130,11 +148,13 @@ class Parser:
                 self.eat(MUL)
             elif token.type == DIV:
                 self.eat(DIV)
+
             node = BinOp(left=node, op=token, right=self.factor())
 
         return node
 
     def expr(self):
+        """expr : term ((PLUS | MINUS) term)*"""
         node = self.term()
 
         while self.current_token.type in (PLUS, MINUS):
@@ -143,6 +163,7 @@ class Parser:
                 self.eat(PLUS)
             elif token.type == MINUS:
                 self.eat(MINUS)
+
             node = BinOp(left=node, op=token, right=self.term())
 
         return node
@@ -150,15 +171,14 @@ class Parser:
     def parse(self):
         return self.expr()
 
-
-class NodeVisitor:
+class NodeVisitor(object):
     def visit(self, node):
         method_name = 'visit_' + type(node).__name__
         visitor = getattr(self, method_name, self.generic_visit)
         return visitor(node)
 
     def generic_visit(self, node):
-        raise Exception(f'No visit_{type(node).__name__} method')
+        raise Exception('No visit_{} method'.format(type(node).__name__))
 
 class Interpreter(NodeVisitor):
     def __init__(self, parser):
@@ -172,28 +192,34 @@ class Interpreter(NodeVisitor):
         elif node.op.type == MUL:
             return self.visit(node.left) * self.visit(node.right)
         elif node.op.type == DIV:
-            return self.visit(node.left) // self.visit(node.right)
+            return self.visit(node.left) / self.visit(node.right)
 
     def visit_Num(self, node):
         return node.value
 
+    def visit_UnaryOp(self, node):
+        op = node.op.type
+        if op == PLUS:
+            return +self.visit(node.expr)
+        elif op == MINUS:
+            return -self.visit(node.expr)
+
     def interpret(self):
         tree = self.parser.parse()
         return self.visit(tree)
-
 
 def main():
     while True:
         try:
             try:
                 text = raw_input('spi> ')
-            except NameError: # Python3
-                text = input(' spi> ')
-        except EOFErorr:
+            except NameError:  # Python 3
+                text = input('spi> ')
+        except EOFError:
             break
         if not text:
             continue
-        
+
         lexer = Lexer(text)
         parser = Parser(lexer)
         interpreter = Interpreter(parser)
