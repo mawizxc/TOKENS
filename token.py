@@ -212,9 +212,9 @@ def main():
     while True:
         try:
             try:
-                text = raw_input('spi> ')
+                text = raw_input('calc> ')
             except NameError:  # Python 3
-                text = input('spi> ')
+                text = input('calc> ')
         except EOFError:
             break
         if not text:
